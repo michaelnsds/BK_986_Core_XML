@@ -34,6 +34,8 @@ import l2r.L2DatabaseFactory;
 import l2r.Server;
 import l2r.UPnPService;
 import l2r.gameserver.cache.HtmCache;
+import l2r.gameserver.communitybbs.SunriseBoards.dropCalc.DropCalculatorConfigs;
+import l2r.gameserver.communitybbs.SunriseBoards.dropCalc.DropInfoHandler;
 import l2r.gameserver.dao.factory.impl.DAOFactory;
 import l2r.gameserver.data.EventDroplist;
 import l2r.gameserver.data.SpawnTable;
@@ -388,6 +390,11 @@ public class GameServer
 		printSection("Sunrise Systems");
 		SunriseServerMods.getInstance().checkSunriseMods();
 		
+		if (DropCalculatorConfigs.ENABLE_DROP_CALCULATOR)
+		{
+			DropInfoHandler.getInstance().load();
+		}
+		
 		if (Config.SAVE_DROPPED_ITEM)
 		{
 			ItemsOnGroundManager.getInstance();
@@ -524,6 +531,7 @@ public class GameServer
 		ServerTypeConfigs.getInstance().loadConfigs();
 		FloodProtectorsConfig.load();
 		// Sunrise configs load section
+		DropCalculatorConfigs.getInstance().loadConfigs();
 		ConfigsController.getInstance().reloadSunriseConfigs();
 		// Check binding address
 		checkFreePorts();
