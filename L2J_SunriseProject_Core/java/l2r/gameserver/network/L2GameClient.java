@@ -563,6 +563,13 @@ public class L2GameClient extends MMOClient<MMOConnection<L2GameClient>>
 				ps.execute();
 			}
 			
+			try (PreparedStatement statement = con.prepareStatement("DELETE FROM character_counters WHERE char_id=?"))
+			{
+				statement.setInt(1, objid);
+				statement.execute();
+				statement.close();
+			}
+			
 			if (Config.L2JMOD_ALLOW_WEDDING)
 			{
 				try (PreparedStatement ps = con.prepareStatement("DELETE FROM mods_wedding WHERE player1Id = ? OR player2Id = ?"))

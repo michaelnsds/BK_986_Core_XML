@@ -33,6 +33,7 @@ import l2r.FloodProtectorsConfig;
 import l2r.L2DatabaseFactory;
 import l2r.Server;
 import l2r.UPnPService;
+import l2r.features.achievementEngine.Achievements;
 import l2r.gameserver.cache.HtmCache;
 import l2r.gameserver.communitybbs.SunriseBoards.dropCalc.DropCalculatorConfigs;
 import l2r.gameserver.communitybbs.SunriseBoards.dropCalc.DropInfoHandler;
@@ -389,6 +390,7 @@ public class GameServer
 		
 		printSection("Sunrise Systems");
 		SunriseServerMods.getInstance().checkSunriseMods();
+		Achievements.getInstance();
 		
 		if (DropCalculatorConfigs.ENABLE_DROP_CALCULATOR)
 		{

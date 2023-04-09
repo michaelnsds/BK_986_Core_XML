@@ -1092,6 +1092,16 @@ public class L2Attackable extends L2Npc
 					{
 						dropItem(player, item); // drop the item on the ground
 					}
+					
+					if (item.getId() == 57)
+					{
+						player.getCounters().onAdena(player.getAdena());
+					}
+					
+					if (item.getId() == 57)
+					{
+						player.getCounters().onAdena(player.getAdena());
+					}
 				}
 				else
 				{

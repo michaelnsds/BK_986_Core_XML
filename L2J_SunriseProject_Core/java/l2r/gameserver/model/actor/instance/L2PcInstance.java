@@ -49,6 +49,8 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import l2r.Config;
 import l2r.L2DatabaseFactory;
+import l2r.features.achievementEngine.Achievements;
+import l2r.features.achievementEngine.IAchievement;
 import l2r.gameserver.GameTimeController;
 import l2r.gameserver.GeoData;
 import l2r.gameserver.ItemsAutoDestroy;
@@ -155,6 +157,7 @@ import l2r.gameserver.model.actor.L2Vehicle;
 import l2r.gameserver.model.actor.appearance.PcAppearance;
 import l2r.gameserver.model.actor.instance.PcInstance.L2PcFishing;
 import l2r.gameserver.model.actor.instance.PcInstance.L2PcHenna;
+import l2r.gameserver.model.actor.instance.PcInstance.L2PlayerCounters;
 import l2r.gameserver.model.actor.instance.PcInstance.PcAdmin;
 import l2r.gameserver.model.actor.knownlist.PcKnownList;
 import l2r.gameserver.model.actor.stat.PcStat;
@@ -1948,6 +1951,7 @@ public final class L2PcInstance extends L2Playable
 	@Override
 	public int getKarma()
 	{
+		getCounters().onKarma(_karma);
 		return _karma;
 	}
 	
@@ -4654,6 +4658,11 @@ public final class L2PcInstance extends L2Playable
 			{
 				ItemsOnGroundManager.getInstance().removeObject(target);
 			}
+			
+			if (target.getId() == 57)
+			{
+				getCounters().onAdena(getAdena());
+			}
 		}
 		
 		// Auto use herbs - pick up
@@ -5285,6 +5294,8 @@ public final class L2PcInstance extends L2Playable
 			spreeKills = 0;
 		}
 		
+		getCounters().onEndSpree();
+		
 		if (isMounted())
 		{
 			stopFeed();
@@ -5441,6 +5452,8 @@ public final class L2PcInstance extends L2Playable
 		
 		AntiFeedManager.getInstance().setLastDeathTime(getObjectId());
 		
+		getCounters().onDie();
+		
 		return true;
 	}
 	
@@ -5504,13 +5517,13 @@ public final class L2PcInstance extends L2Playable
 				{
 					// Don't drop
 					if (itemDrop.isShadowItem() || // Dont drop Shadow Items
-					itemDrop.isTimeLimitedItem() || // Dont drop Time Limited Items
-					!itemDrop.isDropable() || (itemDrop.getId() == Inventory.ADENA_ID) || // Adena
-					(itemDrop.getItem().getType2() == L2Item.TYPE2_QUEST) || // Quest Items
-					(hasSummon() && (getSummon().getControlObjectId() == itemDrop.getId())) || // Control Item of active pet
-					(Arrays.binarySearch(Config.KARMA_LIST_NONDROPPABLE_ITEMS, itemDrop.getId()) >= 0) || // Item listed in the non droppable item list
-					(Arrays.binarySearch(Config.KARMA_LIST_NONDROPPABLE_PET_ITEMS, itemDrop.getId()) >= 0 // Item listed in the non droppable pet item list
-					))
+						itemDrop.isTimeLimitedItem() || // Dont drop Time Limited Items
+						!itemDrop.isDropable() || (itemDrop.getId() == Inventory.ADENA_ID) || // Adena
+						(itemDrop.getItem().getType2() == L2Item.TYPE2_QUEST) || // Quest Items
+						(hasSummon() && (getSummon().getControlObjectId() == itemDrop.getId())) || // Control Item of active pet
+						(Arrays.binarySearch(Config.KARMA_LIST_NONDROPPABLE_ITEMS, itemDrop.getId()) >= 0) || // Item listed in the non droppable item list
+						(Arrays.binarySearch(Config.KARMA_LIST_NONDROPPABLE_PET_ITEMS, itemDrop.getId()) >= 0 // Item listed in the non droppable pet item list
+						))
 					{
 						continue;
 					}
@@ -5619,13 +5632,13 @@ public final class L2PcInstance extends L2Playable
 		
 		// Check if it's pvp
 		if (((checkIfPvP(target) && // Can pvp and
-		(targetPlayer.getPvpFlag() != 0 // Target player has pvp flag set
-		)) || // or
-		(isInsideZone(ZoneIdType.PVP) && // Player is inside pvp zone and
-		targetPlayer.isInsideZone(ZoneIdType.PVP) // Target player is inside pvp zone
-		)) || // or
-		(isInsideZone(ZoneIdType.ZONE_CHAOTIC) && // Player is inside chaotic zone and
-		targetPlayer.isInsideZone(ZoneIdType.ZONE_CHAOTIC))) // Target player is inside chaotic zone
+			(targetPlayer.getPvpFlag() != 0 // Target player has pvp flag set
+			)) || // or
+			(isInsideZone(ZoneIdType.PVP) && // Player is inside pvp zone and
+				targetPlayer.isInsideZone(ZoneIdType.PVP) // Target player is inside pvp zone
+			)) || // or
+			(isInsideZone(ZoneIdType.ZONE_CHAOTIC) && // Player is inside chaotic zone and
+				targetPlayer.isInsideZone(ZoneIdType.ZONE_CHAOTIC))) // Target player is inside chaotic zone
 		{
 			increasePvpKills(target);
 		}
@@ -5685,6 +5698,8 @@ public final class L2PcInstance extends L2Playable
 				ColorSystemHandler.getInstance().updateColor(this);
 				
 				setPvpKills(getPvpKills() + 1);
+				
+				getCounters().onSpree(spreeKills);
 				
 				// Send a Server->Client UserInfo packet to attacker with its Karma and PK Counter
 				sendUserInfo(true);
@@ -7212,6 +7227,18 @@ public final class L2PcInstance extends L2Playable
 			_log.error("Could not insert char data: " + e.getMessage(), e);
 			return false;
 		}
+		
+		try (Connection con = L2DatabaseFactory.getInstance().getConnection();
+			PreparedStatement statement = con.prepareStatement("INSERT INTO character_counters SET char_id=?"))
+		{
+			statement.setInt(1, getObjectId());
+			statement.executeUpdate();
+		}
+		catch (Exception e)
+		{
+			_log.error("Could not insert char counters data: " + e.getMessage(), e);
+			return false;
+		}
 		return true;
 	}
 	
@@ -7270,6 +7297,8 @@ public final class L2PcInstance extends L2Playable
 					player.setKilledSpecificMob(rset.getInt("achievementmobkilled") == 1);
 					
 					player.loadVariables();
+					player.getCounters().load();
+					player.loadAchivementLevel();
 					
 					player.setClanJoinExpiryTime(rset.getLong("clan_join_expiry_time"));
 					if (player.getClanJoinExpiryTime() < System.currentTimeMillis())
@@ -7725,6 +7754,9 @@ public final class L2PcInstance extends L2Playable
 			statement.setDouble(52, getEnchantChance());
 			statement.setInt(53, isKilledSpecificMob() ? 1 : 0);
 			statement.setInt(54, getObjectId());
+			
+			getCounters().save();
+			saveAchivementsLevels();
 			
 			statement.execute();
 		}
@@ -10386,6 +10418,8 @@ public final class L2PcInstance extends L2Playable
 			dlg.addString(String.valueOf(Math.abs(restoreExp)));
 			sendPacket(dlg);
 		}
+		
+		reviver.getCounters().onRessurect();
 	}
 	
 	public void reviveAnswer(int answer)
@@ -11888,6 +11922,8 @@ public final class L2PcInstance extends L2Playable
 			SystemMessage sm = SystemMessage.getSystemMessage(SystemMessageId.C1_HAD_CRITICAL_HIT);
 			sm.addPcName(this);
 			sendPacket(sm);
+			
+			getCounters().onCHit();
 		}
 		if (mcrit)
 		{
@@ -14520,6 +14556,171 @@ public final class L2PcInstance extends L2Playable
 	public long getCurrentOnlineTime()
 	{
 		return System.currentTimeMillis() - _onlineBeginTime;
+	}
+	
+	// ============================================== //
+	// Sunrise Improved Achievement Engine By L][Reunion Team //
+	// ============================================== //
+	
+	private final Map<Integer, Integer> _achivmentLevels = new ConcurrentHashMap<>();
+	private boolean _achivment_rewarding = false;
+	
+	public boolean achivment_nf_open;
+	
+	public boolean isBussy()
+	{
+		return _achivment_rewarding;
+	}
+	
+	public void setBussy(boolean tru)
+	{
+		_achivment_rewarding = tru;
+	}
+	
+	public int getAchivmentLevelbyId(int id)
+	{
+		for (Entry<Integer, Integer> a : _achivmentLevels.entrySet())
+		{
+			if (a.getKey() == id)
+			{
+				return a.getValue();
+			}
+		}
+		return 0;
+	}
+	
+	public boolean getAchivmentLevel(int id, int level)
+	{
+		for (Entry<Integer, Integer> a : _achivmentLevels.entrySet())
+		{
+			if ((a.getKey() == id) && (a.getValue() == level))
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	public Map<Integer, Integer> getAchivments(int category)
+	{
+		Map<Integer, Integer> temp = new LinkedHashMap<>();
+		for (Entry<Integer, Integer> lol : _achivmentLevels.entrySet())
+		{
+			if (Achievements.getInstance().GetAchivment(lol.getKey(), lol.getValue()).getCat() == category)
+			{
+				temp.put(lol.getKey(), lol.getValue());
+			}
+		}
+		return temp;
+	}
+	
+	public int getAchivmentsLevel(int category)
+	{
+		int i = 0;
+		for (Entry<Integer, Integer> lol : _achivmentLevels.entrySet())
+		{
+			if (Achievements.getInstance().GetAchivment(lol.getKey(), lol.getValue()).getCat() == category)
+			{
+				i += lol.getValue();
+			}
+		}
+		return i;
+	}
+	
+	public Map<Integer, Integer> getAchivments()
+	{
+		return _achivmentLevels;
+	}
+	
+	public IAchievement getAchievementByType(String type)
+	{
+		for (Entry<Integer, Integer> lol : _achivmentLevels.entrySet())
+		{
+			IAchievement aaaa = Achievements.getInstance().GetAchivment(lol.getKey(), lol.getValue() + 1);
+			if (aaaa.getType().equals(type))
+			{
+				return aaaa;
+			}
+		}
+		return null;
+	}
+	
+	private void loadAchivementLevel()
+	{
+		try (Connection con = L2DatabaseFactory.getInstance().getConnection();
+			PreparedStatement obj = con.prepareStatement("SELECT * FROM character_achivment_levels WHERE char_id = " + this.getObjectId()))
+		{
+			try (ResultSet rs = obj.executeQuery())
+			{
+				while (rs.next())
+				{
+					String achivments = rs.getString("achivment_levels");
+					
+					if (achivments.isEmpty())
+					{
+						continue;
+					}
+					
+					String[] levels = achivments.split(";");
+					
+					for (String achiv : levels)
+					{
+						String[] lvl = achiv.split(",");
+						_achivmentLevels.put(Integer.parseInt(lvl[0]), Integer.parseInt(lvl[1]));
+					}
+				}
+			}
+		}
+		catch (Exception e)
+		{
+			e.printStackTrace();
+		}
+		
+		for (Entry<Integer, Integer> o : Achievements.getInstance()._achivmentsLevels.entrySet())
+		{
+			if (!_achivmentLevels.containsKey(o.getKey()))
+			{
+				_achivmentLevels.put(o.getKey(), 0);
+			}
+		}
+	}
+	
+	private void saveAchivementsLevels()
+	{
+		String AchivmentString = "";
+		
+		for (Entry<Integer, Integer> a : _achivmentLevels.entrySet())
+		{
+			AchivmentString += a.getKey() + "," + a.getValue() + ";";
+		}
+		
+		try (Connection con = L2DatabaseFactory.getInstance().getConnection();
+			PreparedStatement statement = con.prepareStatement("replace into character_achivment_levels (char_id,achivment_levels) values(?,?)"))
+		{
+			statement.setInt(1, getObjectId());
+			statement.setString(2, AchivmentString);
+			statement.executeUpdate();
+		}
+		catch (Exception e)
+		{
+			_log.warn("store: could not store char achivments data: " + e);
+			e.printStackTrace();
+		}
+	}
+	
+	private L2PlayerCounters _playerCountersExtension = null;
+	
+	/**
+	 * Returns the Management class for all vitality related functions
+	 * @return
+	 */
+	public L2PlayerCounters getCounters()
+	{
+		if (_playerCountersExtension == null)
+		{
+			_playerCountersExtension = new L2PlayerCounters(this);
+		}
+		return _playerCountersExtension;
 	}
 	
 	private final List<Integer> loadedImages = new ArrayList<>();

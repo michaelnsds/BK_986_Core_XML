@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import l2r.Config;
+import l2r.features.achievementEngine.Achievements;
 import l2r.gameserver.communitybbs.Managers.ClanBBSManager;
 import l2r.gameserver.communitybbs.Managers.DonateBBSManager;
 import l2r.gameserver.communitybbs.Managers.DropInfoBBSManager;
@@ -108,6 +109,12 @@ public class BoardsManager
 		else if (command.startsWith("_friendlist_0_") || command.startsWith("_bbs_friends") || command.startsWith("_bbsfriends"))
 		{
 			
+		}
+		else if (command.startsWith("_bbs_achivments"))
+		{
+			String[] cm = command.split(" ");
+			Achievements.getInstance().usebypass(activeChar, command, cm);
+			return;
 		}
 		else if (command.startsWith("_bbsloc"))
 		{
