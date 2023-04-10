@@ -892,6 +892,18 @@ public final class L2PcInstance extends L2Playable
 		return player.createDb() ? player : null;
 	}
 	
+	private boolean _isDummy;
+	
+	public boolean isDummy()
+	{
+		return _isDummy;
+	}
+	
+	public void setDummy(final boolean isDummy)
+	{
+		_isDummy = isDummy;
+	}
+	
 	public static L2PcInstance createDummyPlayer(int objectId, String name)
 	{
 		// Create a new L2PcInstance with an account name
@@ -1072,7 +1084,7 @@ public final class L2PcInstance extends L2Playable
 	 * @param accountName The name of the account including this L2PcInstance
 	 * @param app
 	 */
-	private L2PcInstance(int objectId, L2PcTemplate template, String accountName, PcAppearance app)
+	public L2PcInstance(int objectId, L2PcTemplate template, String accountName, PcAppearance app)
 	{
 		super(objectId, template);
 		setInstanceType(InstanceType.L2PcInstance);
@@ -10956,8 +10968,11 @@ public final class L2PcInstance extends L2Playable
 	@Override
 	public void deleteMe()
 	{
-		cleanup();
-		store();
+		if (!isDummy())
+		{
+			cleanup();
+			store();
+		}
 		super.deleteMe();
 	}
 	
