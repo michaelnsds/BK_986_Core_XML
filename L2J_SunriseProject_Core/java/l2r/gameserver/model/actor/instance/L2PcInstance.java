@@ -47,6 +47,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
+import gr.sr.dressmeEngine.DressMeHandler;
 import l2r.Config;
 import l2r.L2DatabaseFactory;
 import l2r.features.achievementEngine.Achievements;
@@ -65,6 +66,7 @@ import l2r.gameserver.ai.L2SummonAI;
 import l2r.gameserver.cache.WarehouseCacheManager;
 import l2r.gameserver.communitybbs.BB.Forum;
 import l2r.gameserver.communitybbs.Managers.ForumsBBSManager;
+import l2r.gameserver.custom.CustomMethodes;
 import l2r.gameserver.dao.factory.impl.DAOFactory;
 import l2r.gameserver.data.sql.CharNameTable;
 import l2r.gameserver.data.sql.CharSummonTable;
@@ -253,68 +255,9 @@ import l2r.gameserver.model.zone.type.L2BossZone;
 import l2r.gameserver.model.zone.type.L2NoRestartZone;
 import l2r.gameserver.network.L2GameClient;
 import l2r.gameserver.network.SystemMessageId;
-import l2r.gameserver.network.serverpackets.AbstractHtmlPacket;
-import l2r.gameserver.network.serverpackets.ActionFailed;
-import l2r.gameserver.network.serverpackets.ChangeWaitType;
-import l2r.gameserver.network.serverpackets.CharInfo;
-import l2r.gameserver.network.serverpackets.ConfirmDlg;
-import l2r.gameserver.network.serverpackets.EtcStatusUpdate;
-import l2r.gameserver.network.serverpackets.ExAutoSoulShot;
-import l2r.gameserver.network.serverpackets.ExBrExtraUserInfo;
-import l2r.gameserver.network.serverpackets.ExGetBookMarkInfoPacket;
-import l2r.gameserver.network.serverpackets.ExGetOnAirShip;
-import l2r.gameserver.network.serverpackets.ExOlympiadMode;
-import l2r.gameserver.network.serverpackets.ExPrivateStoreSetWholeMsg;
-import l2r.gameserver.network.serverpackets.ExQuestItemList;
-import l2r.gameserver.network.serverpackets.ExSetCompassZoneCode;
-import l2r.gameserver.network.serverpackets.ExShowScreenMessage2;
+import l2r.gameserver.network.serverpackets.*;
 import l2r.gameserver.network.serverpackets.ExShowScreenMessage2.ScreenMessageAlign;
-import l2r.gameserver.network.serverpackets.ExStartScenePlayer;
-import l2r.gameserver.network.serverpackets.ExStorageMaxCount;
-import l2r.gameserver.network.serverpackets.ExVoteSystemInfo;
 import l2r.gameserver.network.serverpackets.FlyToLocation.FlyType;
-import l2r.gameserver.network.serverpackets.FriendStatusPacket;
-import l2r.gameserver.network.serverpackets.GameGuardQuery;
-import l2r.gameserver.network.serverpackets.GetOnVehicle;
-import l2r.gameserver.network.serverpackets.HennaInfo;
-import l2r.gameserver.network.serverpackets.InventoryUpdate;
-import l2r.gameserver.network.serverpackets.ItemList;
-import l2r.gameserver.network.serverpackets.L2GameServerPacket;
-import l2r.gameserver.network.serverpackets.LeaveWorld;
-import l2r.gameserver.network.serverpackets.MagicSkillUse;
-import l2r.gameserver.network.serverpackets.MyTargetSelected;
-import l2r.gameserver.network.serverpackets.NicknameChanged;
-import l2r.gameserver.network.serverpackets.ObservationMode;
-import l2r.gameserver.network.serverpackets.ObservationReturn;
-import l2r.gameserver.network.serverpackets.PartySmallWindowUpdate;
-import l2r.gameserver.network.serverpackets.PetInventoryUpdate;
-import l2r.gameserver.network.serverpackets.PledgeShowMemberListDelete;
-import l2r.gameserver.network.serverpackets.PledgeShowMemberListUpdate;
-import l2r.gameserver.network.serverpackets.PrivateStoreListBuy;
-import l2r.gameserver.network.serverpackets.PrivateStoreListSell;
-import l2r.gameserver.network.serverpackets.PrivateStoreManageListBuy;
-import l2r.gameserver.network.serverpackets.PrivateStoreMsgBuy;
-import l2r.gameserver.network.serverpackets.PrivateStoreMsgSell;
-import l2r.gameserver.network.serverpackets.RecipeShopMsg;
-import l2r.gameserver.network.serverpackets.RecipeShopSellList;
-import l2r.gameserver.network.serverpackets.RelationChanged;
-import l2r.gameserver.network.serverpackets.Ride;
-import l2r.gameserver.network.serverpackets.ServerClose;
-import l2r.gameserver.network.serverpackets.SetupGauge;
-import l2r.gameserver.network.serverpackets.ShortCutInit;
-import l2r.gameserver.network.serverpackets.SkillCoolTime;
-import l2r.gameserver.network.serverpackets.SkillList;
-import l2r.gameserver.network.serverpackets.Snoop;
-import l2r.gameserver.network.serverpackets.SocialAction;
-import l2r.gameserver.network.serverpackets.StatusUpdate;
-import l2r.gameserver.network.serverpackets.StopMove;
-import l2r.gameserver.network.serverpackets.SystemMessage;
-import l2r.gameserver.network.serverpackets.TargetSelected;
-import l2r.gameserver.network.serverpackets.TargetUnselected;
-import l2r.gameserver.network.serverpackets.TradeDone;
-import l2r.gameserver.network.serverpackets.TradeOtherDone;
-import l2r.gameserver.network.serverpackets.TradeStart;
-import l2r.gameserver.network.serverpackets.ValidateLocation;
 import l2r.gameserver.taskmanager.AttackStanceTaskManager;
 import l2r.gameserver.util.Broadcast;
 import l2r.gameserver.util.FloodProtectors;
@@ -11242,6 +11185,13 @@ public final class L2PcInstance extends L2Playable
 			{
 				_log.error("deleteMe()", e);
 			}
+			
+			        try{
+			            CustomMethodes.checkForOldVisuals(this);
+			        }catch (Exception e)
+			        {
+			            _log.error("deleteMe()", e);
+			        }
 		}
 		
 		if (getActiveRequester() != null)
@@ -14483,6 +14433,11 @@ public final class L2PcInstance extends L2Playable
 	{
 		_sunriseVariables.loadVariables();
 	}
+	
+	    public void sendShopPreviewInfoPacket(Map<Integer, Integer> itemList)
+	    {
+	        sendPacket(new ShopPreviewInfo(itemList));
+	    }
 	
 	/**
 	 * Adding Variable to Map<Name, Value>. It's not saved to database. Value can be taken back by {@link #getQuickVarO(String, Object...)} method.

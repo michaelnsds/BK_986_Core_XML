@@ -54,11 +54,11 @@ public final class RequestPreviewItem extends L2GameClientPacket
 	private int _count;
 	private int[] _items;
 	
-	private class RemoveWearItemsTask implements Runnable
+	    public static class RemoveWearItemsTask implements Runnable
 	{
 		private final L2PcInstance activeChar;
 		
-		protected RemoveWearItemsTask(L2PcInstance player)
+		        public RemoveWearItemsTask(L2PcInstance player)
 		{
 			activeChar = player;
 		}
